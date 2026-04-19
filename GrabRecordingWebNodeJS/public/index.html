@@ -1,463 +1,492 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Grab Recording — PBX</title>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Grab Recording — PBX</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f0f4f8;
-      min-height: 100vh;
-      display: flex;
-      align-items: flex-start;
-      justify-content: center;
-      padding: 24px 16px;
-    }
+  .container { max-width: 860px; margin: 0 auto; padding: 20px 12px; }
+  h1 { font-size: 1.3rem; font-weight: 700; color: #7dd3fc; margin-bottom: 16px; }
+  h1 span { color: #94a3b8; font-weight: 400; font-size: .85rem; margin-left: 6px; }
 
-    .container { width: 100%; max-width: 600px; display: flex; flex-direction: column; gap: 16px; }
+  .conn-card { background: #1e2130; border: 1px solid #2d3148; border-radius: 10px; padding: 16px; margin-bottom: 20px; }
+  .conn-card h2 { font-size: .85rem; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; margin-bottom: 12px; }
+  .fields { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 10px; }
+  .fields label { display: flex; flex-direction: column; gap: 4px; font-size: .8rem; color: #94a3b8; }
+  .fields input { background: #0f1117; border: 1px solid #2d3148; border-radius: 6px; padding: 8px 10px; color: #e2e8f0; font-size: 1rem; outline: none; transition: border-color .15s; width: 100%; }
+  .fields input:focus { border-color: #7dd3fc; }
+  .conn-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
 
-    .header { text-align: center; padding: 8px 0; }
-    .header h1 { font-size: 1.6rem; font-weight: 700; color: #1a56db; }
-    .header p  { font-size: 0.85rem; color: #6b7280; margin-top: 4px; }
+  .btn { padding: 10px 18px; border: none; border-radius: 8px; font-size: .9rem; font-weight: 600; cursor: pointer; transition: opacity .15s, transform .1s; display: inline-flex; align-items: center; justify-content: center; gap: 6px; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  .btn:active { transform: scale(.97); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-primary { background: #3b82f6; color: #fff; }
+  .btn-success { background: #22c55e; color: #fff; }
+  .btn-warning { background: #f59e0b; color: #000; }
+  .btn-ghost   { background: #1e2130; border: 1px solid #2d3148; color: #94a3b8; }
+  .btn-sm { padding: 8px 14px; font-size: .82rem; }
 
-    .card {
-      background: #fff;
-      border-radius: 14px;
-      padding: 20px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-    }
-    .card-title {
-      font-size: 0.9rem; font-weight: 600; color: #374151;
-      margin-bottom: 14px; display: flex; align-items: center; gap: 6px;
-    }
+  .steps { display: flex; flex-direction: column; gap: 10px; }
+  .step-card { border-radius: 10px; border: 1px solid #2d3148; overflow: hidden; transition: border-color .2s; }
+  .step-card.active  { border-color: #3b82f6; }
+  .step-card.done    { border-color: #22c55e44; }
+  .step-card.failed  { border-color: #ef444488; }
+  .step-card.waiting { opacity: .45; }
 
-    .form-row { display: flex; gap: 12px; }
-    .field { display: flex; flex-direction: column; gap: 5px; flex: 1; margin-bottom: 12px; }
-    .field label { font-size: 0.78rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.4px; }
-    .field input {
-      padding: 9px 12px; border: 1.5px solid #d1d5db; border-radius: 8px;
-      font-size: 0.93rem; color: #111827; outline: none; transition: border-color 0.15s; width: 100%;
-    }
-    .field input:focus { border-color: #1a56db; }
+  .step-header { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: #1e2130; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
+  .step-badge { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .75rem; font-weight: 700; flex-shrink: 0; }
+  .badge-waiting { background: #2d3148; color: #64748b; }
+  .badge-active  { background: #3b82f6; color: #fff; }
+  .badge-done    { background: #22c55e; color: #fff; }
+  .badge-failed  { background: #ef4444; color: #fff; }
+  .badge-loading { background: #f59e0b; color: #000; animation: pulse .8s infinite alternate; }
+  @keyframes pulse { from { opacity: .6; } to { opacity: 1; } }
 
-    .btn {
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-      width: 100%; padding: 11px 16px; border: none; border-radius: 9px;
-      font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: opacity 0.15s, transform 0.1s;
-    }
-    .btn:active { transform: scale(0.98); }
-    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
-    .btn-primary { background: #1a56db; color: #fff; }
-    .btn-primary:hover:not(:disabled) { background: #1547bd; }
+  .step-title { font-size: .88rem; font-weight: 600; flex: 1; min-width: 0; }
+  .step-summary { font-size: .75rem; color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; }
+  .step-chevron { color: #4b5563; font-size: .8rem; transition: transform .2s; flex-shrink: 0; }
+  .step-card.open .step-chevron { transform: rotate(180deg); }
 
-    /* ── Log panel ─────────────────────────────────────────────────── */
-    #logCard { display: none; }
+  .step-body { background: #13161f; padding: 14px; display: none; }
+  .step-card.open .step-body { display: block; }
 
-    .log-toolbar {
-      display: flex; align-items: center; gap: 8px;
-      margin-bottom: 10px; flex-wrap: wrap;
-    }
-    .log-toolbar span { font-size: 0.9rem; font-weight: 600; color: #374151; flex: 1; }
-    .btn-sm {
-      padding: 4px 10px; border: 1px solid #d1d5db; border-radius: 6px;
-      background: #f9fafb; font-size: 0.78rem; cursor: pointer; color: #374151;
-    }
-    .btn-sm:hover { background: #f3f4f6; }
+  .detail-section { margin-bottom: 12px; }
+  .detail-section h4 { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: #64748b; margin-bottom: 6px; }
+  .json-box { background: #0a0c12; border: 1px solid #1e2539; border-radius: 6px; padding: 10px; font-family: 'Consolas','Fira Code',monospace; font-size: .72rem; line-height: 1.6; color: #93c5fd; white-space: pre-wrap; word-break: break-all; max-height: 280px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
-    #logBox {
-      background: #0f172a;
-      border-radius: 8px;
-      padding: 12px;
-      max-height: 420px;
-      overflow-y: auto;
-      font-family: 'Menlo', 'Consolas', monospace;
-      font-size: 0.78rem;
-      line-height: 1.6;
-    }
+  .kv-grid { display: grid; grid-template-columns: auto 1fr; gap: 5px 10px; font-size: .8rem; align-items: baseline; }
+  .kv-key { color: #94a3b8; white-space: nowrap; }
+  .kv-val { color: #e2e8f0; font-family: monospace; word-break: break-all; }
+  .kv-val.good { color: #4ade80; }
+  .kv-val.bad  { color: #f87171; }
 
-    .log-line {
-      display: flex; gap: 8px; padding: 2px 0;
-      border-bottom: 1px solid rgba(255,255,255,0.04);
-      cursor: pointer;
-    }
-    .log-line:hover { background: rgba(255,255,255,0.05); }
+  .step-actions { margin-top: 14px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .step-error { color: #f87171; font-size: .82rem; background: #2d0f0f; border: 1px solid #7f1d1d; border-radius: 6px; padding: 8px 12px; margin-top: 10px; line-height: 1.5; }
 
-    .log-ts   { color: #475569; white-space: nowrap; flex-shrink: 0; }
-    .log-icon { flex-shrink: 0; width: 16px; text-align: center; }
-    .log-msg  { color: #e2e8f0; word-break: break-all; flex: 1; }
+  .audio-card { background: #1e2130; border: 1px solid #22c55e44; border-radius: 10px; padding: 16px; margin-top: 16px; }
+  .audio-card h3 { font-size: .85rem; text-transform: uppercase; letter-spacing: .06em; color: #22c55e; margin-bottom: 12px; }
+  .audio-meta { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: .8rem; margin-bottom: 14px; }
+  .audio-meta .k { color: #94a3b8; } .audio-meta .v { color: #e2e8f0; }
+  .player-wrap { display: flex; flex-direction: column; gap: 12px; }
+  .seekbar { width: 100%; height: 8px; -webkit-appearance: none; appearance: none; border-radius: 4px; background: #2d3148; outline: none; cursor: pointer; }
+  .seekbar::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: #3b82f6; }
+  .player-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .time-label { font-size: .8rem; color: #64748b; min-width: 80px; }
+  .vol-wrap { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+  .vol-wrap label { font-size: .75rem; color: #64748b; }
+  .vol-slider { width: 70px; }
 
-    .log-line.step     .log-msg { color: #93c5fd; }   /* azul  — etapa */
-    .log-line.ok       .log-msg { color: #86efac; }   /* verde — ok    */
-    .log-line.error    .log-msg { color: #fca5a5; }   /* vermelho — erro */
-    .log-line.request  .log-msg { color: #fde68a; }   /* amarelo — req */
-    .log-line.response .log-msg { color: #c4b5fd; }   /* roxo — resp  */
-    .log-line.info     .log-msg { color: #94a3b8; }   /* cinza — info */
+  .rec-list { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+  .rec-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: #1e2130; border: 1px solid #2d3148; border-radius: 8px; transition: border-color .15s; }
+  .rec-row.rec-selected { border-color: #22c55e; background: #0d2318; }
+  .rec-info { flex: 1; min-width: 0; }
+  .rec-date { font-size: .82rem; color: #e2e8f0; font-weight: 600; display: block; }
+  .rec-meta { font-size: .75rem; color: #94a3b8; display: block; margin-top: 2px; }
 
-    .log-detail {
-      display: none; background: rgba(255,255,255,0.06);
-      border-radius: 6px; padding: 8px; margin: 4px 0 4px 24px;
-      white-space: pre-wrap; color: #cbd5e1; font-size: 0.75rem;
-      word-break: break-all;
-    }
-    .log-line.expanded + .log-detail { display: block; }
-
-    /* ── Recording info ─────────────────────────────────────────────── */
-    .info-grid { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; font-size: 0.88rem; }
-    .info-grid .lbl { color: #6b7280; font-weight: 600; white-space: nowrap; }
-    .info-grid .val { color: #111827; word-break: break-all; }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; background: #d1fae5; color: #065f46; }
-    .badge.unanswered { background: #fee2e2; color: #991b1b; }
-
-    /* ── Player ─────────────────────────────────────────────────────── */
-    .player-wrap { display: flex; flex-direction: column; gap: 14px; }
-    .waveform-bar { display: flex; align-items: center; gap: 10px; }
-    .time-label { font-size: 0.78rem; color: #6b7280; font-variant-numeric: tabular-nums; min-width: 38px; }
-    .time-label.end { text-align: right; }
-
-    input[type=range] { -webkit-appearance: none; appearance: none; flex: 1; height: 4px; background: #d1d5db; border-radius: 4px; outline: none; cursor: pointer; }
-    input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #1a56db; cursor: pointer; border: 2px solid #fff; box-shadow: 0 0 0 1px #1a56db; }
-
-    .controls { display: flex; align-items: center; justify-content: center; gap: 12px; }
-    .ctrl-btn { background: none; border: none; cursor: pointer; padding: 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #374151; transition: background 0.15s; }
-    .ctrl-btn:hover { background: #f3f4f6; }
-    .ctrl-btn.play-btn { background: #1a56db; color: #fff; width: 50px; height: 50px; }
-    .ctrl-btn.play-btn:hover { background: #1547bd; }
-    .volume-row { display: flex; align-items: center; gap: 8px; }
-    .volume-icon { color: #9ca3af; }
-
-    #audioEl { display: none; }
-    .divider { border: none; border-top: 1px solid #e5e7eb; margin: 4px 0; }
-    .hidden { display: none !important; }
-
-    /* spinner */
-    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #d1d5db; border-top-color: #1a56db; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-  </style>
+  @media (max-width: 600px) {
+    .rec-row { flex-direction: column; align-items: stretch; gap: 8px; }
+    .rec-row .btn { width: 100%; }
+    .container { padding: 12px 10px; }
+    h1 { font-size: 1.1rem; }
+    h1 span { display: block; margin-left: 0; margin-top: 2px; }
+    .fields { grid-template-columns: 1fr 1fr; }
+    .conn-actions { flex-direction: column; }
+    .conn-actions .btn { width: 100%; }
+    .step-summary { display: none; }
+    .step-body { padding: 12px 10px; }
+    .json-box { font-size: .68rem; max-height: 200px; }
+    .step-actions { flex-direction: column; align-items: stretch; }
+    .step-actions .btn { width: 100%; }
+    .player-controls { justify-content: space-between; }
+    .vol-wrap { margin-left: 0; width: 100%; }
+    .vol-slider { flex: 1; }
+    .time-label { min-width: 0; }
+    .kv-grid { font-size: .76rem; }
+    .audio-meta { font-size: .76rem; }
+  }
+</style>
 </head>
 <body>
 <div class="container">
+  <h1>🎙 Grab Recording <span>PBX Grandstream UCM</span></h1>
 
-  <div class="header">
-    <h1>📞 Grab Recording</h1>
-    <p>Grandstream UCM6xxx · Última gravação</p>
+  <div class="conn-card">
+    <h2>Conexão</h2>
+    <div class="fields">
+      <label>Host / IP <input id="f-host" placeholder="192.168.1.100" autocomplete="off"/></label>
+      <label>Porta     <input id="f-port" placeholder="8089" value="8089"/></label>
+      <label>Usuário   <input id="f-user" placeholder="admin" autocomplete="off"/></label>
+      <label>Senha     <input id="f-pass" type="password" placeholder="••••••"/></label>
+    </div>
+    <div class="conn-actions">
+      <button class="btn btn-success" onclick="startAuto()">⚡ Iniciar</button>
+      <button class="btn btn-primary" onclick="startFlow()">▶ Debug</button>
+      <button class="btn btn-ghost"   onclick="resetFlow()">↺ Reiniciar</button>
+    </div>
   </div>
 
-  <!-- Config -->
-  <div class="card">
-    <div class="card-title">⚙️ Configuração do PBX</div>
-    <div class="form-row">
-      <div class="field" style="flex:3">
-        <label>IP / Host</label>
-        <input id="host" type="text" placeholder="192.168.1.100" autocomplete="off" />
-      </div>
-      <div class="field" style="flex:1">
-        <label>Porta</label>
-        <input id="port" type="number" placeholder="8089" />
-      </div>
-    </div>
-    <div class="field">
-      <label>Usuário da API</label>
-      <input id="username" type="text" placeholder="cdrapi" autocomplete="off" />
-    </div>
-    <div class="field">
-      <label>Senha da API</label>
-      <input id="password" type="password" placeholder="••••••••" autocomplete="off" />
-    </div>
-    <button class="btn btn-primary" id="btnFetch" onclick="fetchRecording()">
-      🔍 Buscar Última Gravação
-    </button>
-  </div>
+  <div class="steps" id="steps-container"></div>
 
-  <!-- Log panel -->
-  <div class="card" id="logCard">
-    <div class="log-toolbar">
-      <span>🔎 Log de depuração</span>
-      <button class="btn-sm" onclick="copyLog()">📋 Copiar</button>
-      <button class="btn-sm" onclick="clearLog()">🗑 Limpar</button>
-    </div>
-    <div id="logBox"></div>
-    <p style="font-size:0.75rem;color:#9ca3af;margin-top:8px">Clique em qualquer linha para ver detalhes completos.</p>
-  </div>
-
-  <!-- Resultado -->
-  <div class="card hidden" id="cardResult">
-    <div class="card-title">📋 Última Chamada Gravada</div>
-    <div class="info-grid" id="infoGrid"></div>
-    <hr class="divider" style="margin:14px 0" />
+  <div class="audio-card" id="audio-card" style="display:none">
+    <h3>✅ Gravação pronta</h3>
+    <div class="audio-meta" id="audio-meta"></div>
     <div class="player-wrap">
-      <div class="waveform-bar">
-        <span class="time-label" id="timeCurrent">0:00</span>
-        <input type="range" id="seekBar" min="0" max="100" value="0" step="0.1" />
-        <span class="time-label end" id="timeTotal">0:00</span>
-      </div>
-      <div class="controls">
-        <button class="ctrl-btn" title="Voltar 10s" onclick="skip(-10)">
-          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 17l-5-5 5-5"/><path d="M18 17l-5-5 5-5"/></svg>
-        </button>
-        <button class="ctrl-btn play-btn" id="btnPlay" onclick="togglePlay()">
-          <svg id="iconPlay" width="22" height="22" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-          <svg id="iconPause" class="hidden" width="22" height="22" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
-        </button>
-        <button class="ctrl-btn" title="Avançar 10s" onclick="skip(10)">
-          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 17l5-5-5-5"/><path d="M6 17l5-5-5-5"/></svg>
-        </button>
-      </div>
-      <div class="volume-row">
-        <span class="volume-icon">🔈</span>
-        <input type="range" id="volBar" min="0" max="1" step="0.05" value="1" style="width:110px" oninput="audio.volume=this.value" />
-        <span class="volume-icon">🔊</span>
+      <input type="range" class="seekbar" id="seekbar" value="0" min="0" step="0.1"/>
+      <div class="player-controls">
+        <button class="btn btn-ghost btn-sm" onclick="skip(-10)">⏪ 10s</button>
+        <button class="btn btn-primary btn-sm" id="play-btn" onclick="togglePlay()">▶ Play</button>
+        <button class="btn btn-ghost btn-sm" onclick="skip(10)">10s ⏩</button>
+        <span class="time-label" id="time-label">0:00 / 0:00</span>
+        <div class="vol-wrap">
+          <label>Vol</label>
+          <input type="range" class="vol-slider" id="vol-slider" min="0" max="1" step="0.05" value="1" oninput="audio.volume=this.value"/>
+        </div>
       </div>
     </div>
-    <audio id="audioEl"></audio>
+    <audio id="audio-el" preload="metadata"></audio>
   </div>
-
 </div>
 
 <script>
-// ── Persist config ─────────────────────────────────────────────────────────
-const FIELDS = ['host','port','username','password'];
-FIELDS.forEach(id => {
-  const el = document.getElementById(id);
-  el.value = localStorage.getItem('pbx_' + id) || '';
-  el.addEventListener('change', () => localStorage.setItem('pbx_' + id, el.value));
-});
-if (!document.getElementById('port').value)
-  document.getElementById('port').value = '8089';
+// ── state ──────────────────────────────────────────────────────────────────
+const S = { host:'', port:'8089', username:'', password:'', challenge:'', cookie:'', audioUrl:'', selectedRecording: null };
+let _selectResolve = null;
 
-// ── Audio ──────────────────────────────────────────────────────────────────
-const audio = document.getElementById('audioEl');
-let duration = 0;
-
-// ── Log panel ──────────────────────────────────────────────────────────────
-const logBox  = document.getElementById('logBox');
-const logCard = document.getElementById('logCard');
-let   logLines = [];   // texto puro para copiar
-
-function nowStr() {
-  return new Date().toTimeString().substring(0,8);
+const CRED_KEY = 'pbx_creds';
+function saveCreds() { localStorage.setItem(CRED_KEY, JSON.stringify({host:S.host,port:S.port,username:S.username,password:S.password})); }
+function loadCreds() {
+  try {
+    const c = JSON.parse(localStorage.getItem(CRED_KEY)||'{}');
+    if(c.host)     { S.host=c.host;         document.getElementById('f-host').value=c.host; }
+    if(c.port)     { S.port=c.port;         document.getElementById('f-port').value=c.port; }
+    if(c.username) { S.username=c.username; document.getElementById('f-user').value=c.username; }
+    if(c.password) { S.password=c.password; document.getElementById('f-pass').value=c.password; }
+  } catch(_) {}
 }
 
-const TYPE_META = {
-  step:     { icon: '▶', cls: 'step'     },
-  ok:       { icon: '✓', cls: 'ok'       },
-  error:    { icon: '✗', cls: 'error'    },
-  request:  { icon: '↑', cls: 'request'  },
-  response: { icon: '↓', cls: 'response' },
-  info:     { icon: '·', cls: 'info'     },
-  done:     { icon: '★', cls: 'ok'       },
-};
+// ── steps ──────────────────────────────────────────────────────────────────
+const STEPS = [
+  { id:'challenge', label:'Challenge',            tag:'',    desc:'Obtém token de autenticação do PBX' },
+  { id:'login',     label:'Login',                tag:'',    desc:'Autentica com usuário e senha (MD5)' },
+  { id:'cdr',       label:'CDR',                  tag:'',    desc:'Busca registros de chamadas dos últimos 2 dias' },
+  { id:'select',    label:'Selecionar gravação',  tag:'',    desc:'Escolha qual gravação deseja baixar' },
+  { id:'recinfo',   label:'getRecordInfosByCall', tag:'',    desc:'Obtém o caminho do arquivo usando o AcctId do CDR' },
+  { id:'download',  label:'Download (recapi)',    tag:'',    desc:'Baixa o arquivo de áudio' },
+  { id:'logout',    label:'Logout',               tag:'',    desc:'Encerra a sessão no PBX' },
+];
 
-function addLog(obj) {
-  logCard.style.display = '';
-  const meta   = TYPE_META[obj.type] || { icon: '·', cls: 'info' };
-  const detail = buildDetail(obj);
-  const plainMsg = buildPlainMsg(obj);
+let stepStates = {};
+let stepData   = {};
 
-  logLines.push(`[${nowStr()}] [${obj.type}] ${plainMsg}`);
-  if (detail) logLines.push('  ' + detail);
+// ── render ─────────────────────────────────────────────────────────────────
+function renderAll() {
+  const c = document.getElementById('steps-container');
+  c.innerHTML = '';
+  STEPS.forEach((step, idx) => {
+    c.appendChild(buildCard(step, idx+1, stepStates[step.id]||'waiting', stepData[step.id]));
+  });
+}
 
-  const line = document.createElement('div');
-  line.className = `log-line ${meta.cls}`;
-  line.innerHTML = `
-    <span class="log-ts">${nowStr()}</span>
-    <span class="log-icon">${meta.icon}</span>
-    <span class="log-msg">${esc(plainMsg)}</span>`;
+function buildCard(step, num, st, data) {
+  const div = document.createElement('div');
+  div.className = 'step-card ' + st;
+  div.id = 'card-' + step.id;
+  if (st === 'active' || st === 'failed' || st === 'loading') div.classList.add('open');
 
-  if (detail) {
-    const detDiv = document.createElement('div');
-    detDiv.className = 'log-detail';
-    detDiv.textContent = detail;
-    line.addEventListener('click', () => {
-      line.classList.toggle('expanded');
-    });
-    logBox.appendChild(line);
-    logBox.appendChild(detDiv);
-  } else {
-    logBox.appendChild(line);
+  const bc = {waiting:'badge-waiting',active:'badge-active',loading:'badge-loading',done:'badge-done',failed:'badge-failed'}[st];
+  const bs = {waiting:num,active:num,loading:'…',done:'✓',failed:'✗'}[st];
+
+  div.innerHTML = `
+    <div class="step-header" onclick="toggleCard('${step.id}')">
+      <div class="step-badge ${bc}">${bs}</div>
+      <div class="step-title">${esc(step.label)}</div>
+      <div class="step-summary">${buildSummary(step.id,st,data)}</div>
+      <div class="step-chevron">▼</div>
+    </div>
+    <div class="step-body" id="body-${step.id}">${buildBody(step,st,data)}</div>`;
+  return div;
+}
+
+function buildSummary(id, st, data) {
+  if (st==='waiting') return 'aguardando...';
+  if (st==='loading') return '<span style="color:#f59e0b">executando...</span>';
+  if (!data) return '';
+  if (!data.ok) return '<span style="color:#f87171">'+esc(data.error||'erro')+'</span>';
+  const m = {
+    challenge: ()=> 'challenge: '+esc(data.challenge),
+    login:     ()=> 'cookie obtido',
+    cdr:       ()=> { const n=data.recordsWithAudio||0; return n+' gravação'+(n===1?'':'ões')+' encontrada'+(n===1?'':'s'); },
+    select:    ()=> { const s=data?.selected; return s ? esc(s.start)+' | '+s.duration+'s' : 'aguardando seleção'; },
+    recinfo:   ()=> esc(data.chosen||''),
+    download:  ()=> data.fileSizeBytes ? (data.fileSizeBytes/1024).toFixed(1)+' KB' : '',
+    logout:    ()=> 'ok',
+  };
+  return m[id] ? m[id]() : '';
+}
+
+function buildBody(step, st, data) {
+  if (st==='waiting') return '<p style="color:#64748b;font-size:.83rem">'+esc(step.desc)+'</p>';
+  if (st==='loading') return '<p style="color:#f59e0b;font-size:.83rem">⏳ Aguardando resposta da API...</p>';
+  if (step.id === 'select') return buildSelectBody(st, data);
+  if (!data) return '';
+
+  let html = '';
+
+  if (data.detail) {
+    html += sec('Requisição enviada', '<div class="json-box">'+esc(pretty(data.detail.request?.body))+'</div>');
+    html += sec('Resposta do PBX',    '<div class="json-box">'+esc(pretty(data.detail.response))+'</div>');
   }
 
-  logBox.scrollTop = logBox.scrollHeight;
-}
-
-function buildPlainMsg(obj) {
-  if (obj.msg) return obj.msg;
-  if (obj.type === 'request')  return `→ POST ${obj.url || ''} — ${JSON.stringify(obj.payload || {}).substring(0,120)}`;
-  if (obj.type === 'response') return `← HTTP ${obj.status} — ${JSON.stringify(obj.body || obj.headers || {}).substring(0,120)}`;
-  if (obj.type === 'done')     return `✅ Concluído — arquivo: ${obj.audioFile} (${formatBytes(obj.fileSizeBytes)})`;
-  return JSON.stringify(obj).substring(0, 200);
-}
-
-function buildDetail(obj) {
-  const skip = ['type','step','msg'];
-  const rest = {};
-  for (const [k,v] of Object.entries(obj)) {
-    if (!skip.includes(k)) rest[k] = v;
+  if (!data.ok) {
+    html += '<div class="step-error">❌ '+esc(data.error||'Erro')+'</div>';
+    if (data.raw) html += sec('Raw', '<div class="json-box">'+esc(data.raw)+'</div>');
+    html += '<div class="step-actions"><button class="btn btn-warning" onclick="runStep(\''+step.id+'\')">↺ Tentar novamente</button></div>';
+    return html;
   }
-  if (Object.keys(rest).length === 0) return '';
-  return JSON.stringify(rest, null, 2);
+
+  html += buildKV(step.id, data);
+  html += buildNextBtn(step.id);
+  return html;
 }
 
-function clearLog() {
-  logBox.innerHTML = '';
-  logLines = [];
+function buildKV(id, data) {
+  const tables = {
+    challenge: [['Challenge token', data.challenge]],
+    login:     [['Cookie', data.cookie], ['Token MD5', data.token]],
+    cdr: () => {
+      const pages = (data.detail && data.detail.allPages) ? data.detail.allPages : [];
+      const pagesStr = pages.map(p => 'offset='+p.offset+' HTTP '+p.httpStatus).join(' | ') || '-';
+      return [
+        ['Paginas buscadas',   String(data.totalPages ?? '-')],
+        ['Resumo das paginas', pagesStr],
+        ['Total CDRs',         String(data.totalRecords)],
+        ['Com gravacao',       String(data.recordsWithAudio), data.recordsWithAudio > 0 ? 'good' : 'bad'],
+      ];
+    },
+    recinfo: [
+      ['Todos os arquivos', (data.allPaths||[]).join('\n')],
+      ['Escolhido',  data.chosen],
+      ['filedir',    data.filedir,  'good'],
+      ['filename',   data.filename, 'good'],
+    ],
+    download: [
+      ['Arquivo',  data.filename],
+      ['Tamanho',  data.fileSizeBytes ? (data.fileSizeBytes/1024).toFixed(1)+' KB' : '-'],
+    ],
+    logout: [['Status','Sessão encerrada']],
+  };
+
+  let pairs = tables[id];
+  if (typeof pairs === 'function') pairs = pairs();
+  if (!pairs || !pairs.length) return '';
+
+  let html = '<div class="detail-section"><h4>Valores extraídos</h4><div class="kv-grid">';
+  pairs.forEach(([k,v,cls]) => {
+    html += '<span class="kv-key">'+esc(String(k))+'</span>'
+          + '<span class="kv-val '+(cls||'')+'">'+ esc(String(v??''))+'</span>';
+  });
+  html += '</div></div>';
+  return html;
 }
 
-function copyLog() {
-  navigator.clipboard.writeText(logLines.join('\n'))
-    .then(() => alert('Log copiado para a área de transferência!'))
-    .catch(() => alert('Não foi possível copiar automaticamente. Selecione o texto manualmente.'));
+function buildNextBtn(id) {
+  const next = {challenge:'login',login:'cdr',cdr:'select',select:'recinfo',recinfo:'download',download:'logout',logout:null};
+  const nextId = next[id];
+
+  if (id==='cdr' && !(stepData.cdr?.recordings?.length))
+    return '<div class="step-actions"><span style="color:#f87171;font-size:.83rem">Não há gravações encontradas.</span></div>';
+
+  if (id==='select' && !stepData.select?.selected)
+    return '';
+
+  if (id==='logout')
+    return '<div class="step-actions"><button class="btn btn-success" onclick="showAudio()">🎵 Ouvir gravação</button></div>';
+
+  if (!nextId) return '';
+  const label = STEPS.find(s=>s.id===nextId)?.label||nextId;
+  return '<div class="step-actions"><button class="btn btn-success" onclick="runStep(\''+nextId+'\')">▶ Próximo: '+esc(label)+'</button></div>';
 }
 
-// ── Fetch com streaming ────────────────────────────────────────────────────
-async function fetchRecording() {
-  const host     = document.getElementById('host').value.trim();
-  const port     = document.getElementById('port').value.trim() || '8089';
-  const username = document.getElementById('username').value.trim();
-  const password = document.getElementById('password').value;
-
-  if (!host || !username || !password) {
-    addLog({ type: 'error', step: 'validation', msg: '⚠️ Preencha o IP/host, usuário e senha.' });
+// ── execution ──────────────────────────────────────────────────────────────
+async function runStep(id) {
+  readForm(); saveCreds();
+  if (id === 'select') {
+    S.selectedRecording = null;
+    stepData['select'] = null;
+    setStepState('select', 'active');
+    renderAll(); scroll('select');
+    await new Promise(resolve => { _selectResolve = resolve; });
     return;
   }
-
-  FIELDS.forEach(id => localStorage.setItem('pbx_' + id, document.getElementById(id).value));
-
-  clearLog();
-  document.getElementById('cardResult').classList.add('hidden');
-  setBtnLoading(true);
-
-  addLog({ type: 'info', msg: `Iniciando busca: ${username}@${host}:${port}` });
-
+  setStepState(id, 'loading');
+  renderAll(); scroll(id);
   try {
-    const resp = await fetch('/api/fetch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ host, port: Number(port), username, password })
-    });
+    const result = await callStep(id);
+    stepData[id] = result;
+    setStepState(id, result.ok ? 'done' : 'failed');
+  } catch(e) {
+    stepData[id] = { ok:false, error:String(e) };
+    setStepState(id, 'failed');
+  }
+  renderAll(); scroll(id);
+  if (id==='logout' && stepData[id]?.ok) showAudio();
+}
 
-    const reader  = resp.body.getReader();
-    const decoder = new TextDecoder();
-    let   buffer  = '';
+function selectRecording(idx) {
+  const rec = stepData.cdr?.recordings?.[idx];
+  if (!rec) return;
+  S.selectedRecording = rec;
+  stepData['select'] = { ok: true, selected: rec };
+  setStepState('select', 'done');
+  renderAll();
+  scroll('select');
+  if (_selectResolve) { _selectResolve(); _selectResolve = null; }
+}
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+function buildSelectBody(st, data) {
+  const recordings = stepData.cdr?.recordings || [];
+  if (recordings.length === 0)
+    return '<div class="step-error">Nenhuma gravação disponível para seleção.</div>';
 
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop();   // último fragmento incompleto
+  const selected = data?.selected;
+  let html = '<div class="detail-section"><h4>Selecione uma gravação</h4><div class="rec-list">';
+  recordings.forEach((rec, idx) => {
+    const isSel = selected && selected.cdrId === rec.cdrId;
+    html += '<div class="rec-row'+(isSel?' rec-selected':'')+'">'+
+      '<div class="rec-info">'+
+        '<span class="rec-date">'+esc(rec.start)+'</span>'+
+        '<span class="rec-meta">'+esc(rec.caller)+' → '+esc(rec.callee)+
+          ' &nbsp;|&nbsp; '+esc(rec.duration)+'s'+
+          ' &nbsp;|&nbsp; '+esc(rec.disposition)+
+        '</span>'+
+      '</div>'+
+      '<button class="btn btn-sm '+(isSel?'btn-success':'btn-primary')+'" onclick="selectRecording('+idx+')">'+
+        (isSel ? '✓ Selecionado' : 'Selecionar')+
+      '</button>'+
+    '</div>';
+  });
+  html += '</div></div>';
+  if (selected) html += buildNextBtn('select');
+  return html;
+}
 
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        try {
-          const obj = JSON.parse(line);
-          addLog(obj);
+async function callStep(id) {
+  const base = { host:S.host, port:S.port, username:S.username, password:S.password };
+  const ri   = stepData.recinfo || {};
 
-          if (obj.type === 'done') {
-            showRecording(obj);
-          }
-        } catch (e) {
-          addLog({ type: 'info', msg: `[raw] ${line}` });
-        }
-      }
-    }
+  const bodies = {
+    challenge: base,
+    login:     { ...base, challenge: S.challenge },
+    cdr:       { host:S.host, port:S.port, cookie:S.cookie },
+    recinfo:   { host:S.host, port:S.port, cookie:S.cookie, acctId: S.selectedRecording?.cdrId },
+    download:  { host:S.host, port:S.port, cookie:S.cookie,
+                 filedir:  ri.filedir,
+                 filename: ri.filename },
+    logout:    { host:S.host, port:S.port, cookie:S.cookie },
+  };
 
-    // Processa sobras do buffer
-    if (buffer.trim()) {
-      try {
-        const obj = JSON.parse(buffer);
-        addLog(obj);
-        if (obj.type === 'done') showRecording(obj);
-      } catch (_) {}
-    }
+  const resp = await fetch('/api/step/'+id, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(bodies[id]||base)
+  });
+  const json = await resp.json();
+  if (json.ok) {
+    if (id==='challenge') S.challenge = json.challenge;
+    if (id==='login')     S.cookie    = json.cookie;
+    if (id==='download')  S.audioUrl  = json.audioUrl;
+  }
+  return json;
+}
 
-  } catch (err) {
-    addLog({ type: 'error', step: 'network', msg: `Falha de rede: ${err.message}`, raw: String(err) });
-  } finally {
-    setBtnLoading(false);
+// ── flow control ───────────────────────────────────────────────────────────
+function startFlow() {
+  readForm();
+  if (!S.host||!S.username||!S.password) { alert('Preencha Host, Usuário e Senha.'); return; }
+  resetFlow(false);
+  STEPS.forEach((s,i) => { stepStates[s.id] = i===0 ? 'active' : 'waiting'; });
+  renderAll();
+  runStep('challenge');
+}
+
+async function startAuto() {
+  readForm();
+  if (!S.host||!S.username||!S.password) { alert('Preencha Host, Usuário e Senha.'); return; }
+  resetFlow(false);
+  STEPS.forEach((s,i) => { stepStates[s.id] = i===0 ? 'active' : 'waiting'; });
+  renderAll();
+  for (const step of STEPS) {
+    await runStep(step.id);
+    if (!stepData[step.id]?.ok) break;
   }
 }
 
-// ── Render recording ───────────────────────────────────────────────────────
-function showRecording({ recording, audioFile, fileSizeBytes }) {
-  const answered = (recording.disposition || '').toUpperCase() === 'ANSWERED';
-  const badge = `<span class="badge ${answered ? '' : 'unanswered'}">${esc(recording.disposition || '—')}</span>`;
-
-  document.getElementById('infoGrid').innerHTML = `
-    <span class="lbl">De</span>       <span class="val">${esc(recording.caller)}</span>
-    <span class="lbl">Para</span>     <span class="val">${esc(recording.callee)}</span>
-    <span class="lbl">Início</span>   <span class="val">${esc(recording.start)}</span>
-    <span class="lbl">Duração</span>  <span class="val">${formatSec(Number(recording.duration))}</span>
-    <span class="lbl">Status</span>   <span class="val">${badge}</span>
-    <span class="lbl">Arquivo</span>  <span class="val" style="font-size:.78rem">${esc(audioFile)}</span>
-    <span class="lbl">Tamanho</span>  <span class="val">${formatBytes(fileSizeBytes)}</span>`;
-
-  audio.src = '/api/audio/' + encodeURIComponent(audioFile);
-  audio.load();
-  resetPlayer();
-  document.getElementById('cardResult').classList.remove('hidden');
-  document.getElementById('cardResult').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+function resetFlow(full=true) {
+  if (full) Object.assign(S, {challenge:'',cookie:'',audioUrl:'',selectedRecording:null});
+  _selectResolve = null;
+  stepStates={}; stepData={};
+  STEPS.forEach(s => stepStates[s.id]='waiting');
+  document.getElementById('audio-card').style.display='none';
+  renderAll();
 }
 
-// ── Player ─────────────────────────────────────────────────────────────────
-function togglePlay() { audio.paused ? audio.play() : audio.pause(); }
-function skip(s)      { audio.currentTime = Math.max(0, Math.min(audio.duration||0, audio.currentTime+s)); }
-function resetPlayer() {
-  document.getElementById('seekBar').value = 0;
-  document.getElementById('timeCurrent').textContent = '0:00';
-  document.getElementById('timeTotal').textContent   = '0:00';
-  setPlayIcon(true); duration = 0;
-}
-function setPlayIcon(isPlay) {
-  document.getElementById('iconPlay').classList.toggle('hidden', !isPlay);
-  document.getElementById('iconPause').classList.toggle('hidden', isPlay);
+function setStepState(id, st) {
+  stepStates[id] = st;
+  if (st==='done') {
+    const idx = STEPS.findIndex(s=>s.id===id);
+    if (idx>=0 && idx+1<STEPS.length) stepStates[STEPS[idx+1].id]='active';
+  }
 }
 
-audio.addEventListener('play',  () => setPlayIcon(false));
-audio.addEventListener('pause', () => setPlayIcon(true));
-audio.addEventListener('ended', () => setPlayIcon(true));
-audio.addEventListener('loadedmetadata', () => {
-  duration = audio.duration;
-  document.getElementById('timeTotal').textContent = fmtTime(duration);
+function scroll(id) { setTimeout(()=>document.getElementById('card-'+id)?.scrollIntoView({behavior:'smooth',block:'nearest'}),50); }
+function toggleCard(id) { document.getElementById('card-'+id)?.classList.toggle('open'); }
+function readForm() {
+  S.host=document.getElementById('f-host').value.trim();
+  S.port=document.getElementById('f-port').value.trim()||'8089';
+  S.username=document.getElementById('f-user').value.trim();
+  S.password=document.getElementById('f-pass').value;
+}
+
+function esc(s)    { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function pretty(o) { return o===undefined?'':(typeof o==='string'?o:JSON.stringify(o,null,2)); }
+function sec(title,inner) { return '<div class="detail-section"><h4>'+esc(title)+'</h4>'+inner+'</div>'; }
+
+// ── audio ──────────────────────────────────────────────────────────────────
+const audio   = document.getElementById('audio-el');
+const seekbar = document.getElementById('seekbar');
+
+function showAudio() {
+  const dl  = stepData.download;
+  const cdr = S.selectedRecording;
+  if (!dl?.ok||!dl.audioUrl) return;
+  const card = document.getElementById('audio-card');
+  card.style.display='block';
+  card.scrollIntoView({behavior:'smooth'});
+  document.getElementById('audio-meta').innerHTML = [
+    ['Arquivo',dl.filename],['Tamanho',(dl.fileSizeBytes/1024).toFixed(1)+' KB'],
+    cdr&&['Origem',cdr.caller], cdr&&['Destino',cdr.callee],
+    cdr&&['Início',cdr.start],  cdr&&['Duração',cdr.duration+' s'],
+  ].filter(Boolean).map(([k,v])=>'<span class="k">'+esc(k)+'</span><span class="v">'+esc(String(v??''))+'</span>').join('');
+  audio.src=dl.audioUrl; audio.load();
+}
+
+audio.addEventListener('timeupdate',()=>{
+  if(!audio.duration) return;
+  seekbar.value=(audio.currentTime/audio.duration)*100;
+  document.getElementById('time-label').textContent=fmt(audio.currentTime)+' / '+fmt(audio.duration);
 });
-audio.addEventListener('timeupdate', () => {
-  if (!duration) return;
-  document.getElementById('seekBar').value = (audio.currentTime / duration) * 100;
-  document.getElementById('timeCurrent').textContent = fmtTime(audio.currentTime);
-});
-document.getElementById('seekBar').addEventListener('input', function() {
-  if (duration) audio.currentTime = (this.value / 100) * duration;
-});
+audio.addEventListener('ended',()=>{ document.getElementById('play-btn').textContent='▶ Play'; });
+seekbar.addEventListener('input',()=>{ if(audio.duration) audio.currentTime=(seekbar.value/100)*audio.duration; });
+function togglePlay(){ if(audio.paused){audio.play();document.getElementById('play-btn').textContent='⏸ Pause';}
+                       else{audio.pause();document.getElementById('play-btn').textContent='▶ Play';} }
+function skip(s){ audio.currentTime=Math.max(0,audio.currentTime+s); }
+function fmt(t){ if(!t||isNaN(t))return'0:00'; const m=Math.floor(t/60),s=Math.floor(t%60); return m+':'+s.toString().padStart(2,'0'); }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-function setBtnLoading(on) {
-  const btn = document.getElementById('btnFetch');
-  btn.disabled = on;
-  btn.innerHTML = on
-    ? '<span class="spinner"></span>Aguarde…'
-    : '🔍 Buscar Última Gravação';
-}
-
-function fmtTime(s) {
-  if (!isFinite(s)) return '0:00';
-  return `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
-}
-function formatSec(t) { return `${Math.floor(t/60)}m ${t%60}s`; }
-function formatBytes(b) {
-  if (b >= 1048576) return (b/1048576).toFixed(1)+' MB';
-  if (b >= 1024)    return (b/1024).toFixed(1)+' KB';
-  return b+' B';
-}
-function esc(s) {
-  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-document.getElementById('password').addEventListener('keydown', e => {
-  if (e.key === 'Enter') fetchRecording();
-});
+// ── boot ───────────────────────────────────────────────────────────────────
+loadCreds();
+resetFlow();
 </script>
 </body>
 </html>
