@@ -15,12 +15,12 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="📞 Grab Recording"
+            android:text="🎙 Grab Recording"
             android:textSize="24sp"
             android:textStyle="bold"
             android:textColor="@color/primary"
             android:gravity="center"
-            android:paddingBottom="8dp" />
+            android:paddingBottom="4dp" />
 
         <TextView
             android:layout_width="match_parent"
@@ -54,14 +54,12 @@
                     android:textColor="@color/text_primary"
                     android:paddingBottom="12dp" />
 
-                <!-- Host -->
                 <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:hint="IP / Host do PBX (ex: 192.168.1.100)"
                     style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                     android:layout_marginBottom="12dp">
-
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etHost"
                         android:layout_width="match_parent"
@@ -70,14 +68,12 @@
                         android:imeOptions="actionNext" />
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- Porta -->
                 <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:hint="Porta HTTPS (padrão: 8089)"
                     style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                     android:layout_marginBottom="12dp">
-
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etPort"
                         android:layout_width="match_parent"
@@ -86,14 +82,12 @@
                         android:imeOptions="actionNext" />
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- Usuário -->
                 <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:hint="Usuário da API"
                     style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                     android:layout_marginBottom="12dp">
-
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etUser"
                         android:layout_width="match_parent"
@@ -102,7 +96,6 @@
                         android:imeOptions="actionNext" />
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- Senha -->
                 <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -110,7 +103,6 @@
                     style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                     app:endIconMode="password_toggle"
                     android:layout_marginBottom="16dp">
-
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etPass"
                         android:layout_width="match_parent"
@@ -119,12 +111,11 @@
                         android:imeOptions="actionDone" />
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- Botão Buscar -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnFetch"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="🔍 Buscar Última Gravação"
+                    android:text="🔍 Buscar Gravações"
                     android:textSize="15sp"
                     android:paddingTop="12dp"
                     android:paddingBottom="12dp"
@@ -146,14 +137,51 @@
             android:id="@+id/tvStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Configure o PBX e toque em &quot;Buscar Última Gravação&quot;"
+            android:text="Configure o PBX e toque em &quot;Buscar Gravações&quot;"
             android:textSize="14sp"
             android:textColor="@color/text_secondary"
             android:gravity="center"
             android:paddingBottom="16dp"
             android:visibility="visible" />
 
-        <!-- Card de Gravação -->
+        <!-- Card de Seleção de Gravação -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardRecordingList"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="4dp"
+            android:layout_marginBottom="16dp"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="🎙 Selecione uma gravação"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary"
+                    android:paddingBottom="12dp" />
+
+                <!-- Linhas de gravação inseridas programaticamente -->
+                <LinearLayout
+                    android:id="@+id/llRecordingItems"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:divider="?android:listDivider"
+                    android:showDividers="middle" />
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Card de Gravação Selecionada -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardRecording"
             android:layout_width="match_parent"
@@ -172,7 +200,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="📋 Última Gravação"
+                    android:text="✅ Gravação pronta"
                     android:textSize="16sp"
                     android:textStyle="bold"
                     android:textColor="@color/text_primary"
@@ -261,7 +289,6 @@
                     android:textColor="@color/text_primary"
                     android:paddingBottom="12dp" />
 
-                <!-- SeekBar -->
                 <SeekBar
                     android:id="@+id/seekBar"
                     android:layout_width="match_parent"
@@ -269,7 +296,6 @@
                     android:visibility="gone"
                     android:layout_marginBottom="4dp" />
 
-                <!-- Tempo -->
                 <TextView
                     android:id="@+id/tvTime"
                     android:layout_width="match_parent"
@@ -281,7 +307,6 @@
                     android:visibility="gone"
                     android:paddingBottom="12dp" />
 
-                <!-- Botões Play/Pause e Stop -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

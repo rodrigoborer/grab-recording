@@ -15,7 +15,8 @@ import java.io.File
 sealed class UiState {
     object Idle : UiState()
     data class Loading(val message: String) : UiState()
-    data class RecordingFound(val recording: CallRecording, val file: File?) : UiState()
+    data class SelectRecording(val recordings: List<CallRecording>) : UiState()
+    data class RecordingReady(val recording: CallRecording, val file: File) : UiState()
     data class Playing(val recording: CallRecording, val file: File) : UiState()
     data class Paused(val recording: CallRecording, val file: File) : UiState()
     data class Error(val message: String) : UiState()
@@ -34,68 +35,100 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var currentFile: File? = null
     private var currentRecording: CallRecording? = null
 
+    // Cliente PBX mantido entre as etapas de busca e seleção
+    private var pbxClient: PbxApiClient? = null
+
     // ─────────────────────────────────────────────────────────────────────────
-    // Ação principal: busca e baixa a última gravação
+    // Etapa 1: Busca — autentica e lista as gravações disponíveis
     // ─────────────────────────────────────────────────────────────────────────
 
-    fun fetchAndDownloadLastRecording(
+    fun fetchRecordings(
         pbxHost: String,
         pbxPort: Int,
         username: String,
         password: String
     ) {
         viewModelScope.launch {
+            // Encerra cliente anterior se houver
+            withContext(Dispatchers.IO) { pbxClient?.logout() }
+            pbxClient = null
+
             val client = PbxApiClient(
-                pbxHost = pbxHost.trim(),
-                pbxPort = pbxPort,
-                username = username.trim(),
-                password = password
+                pbxHost   = pbxHost.trim(),
+                pbxPort   = pbxPort,
+                username  = username.trim(),
+                password  = password
             )
 
             try {
-                // 1. Autenticar
                 _uiState.value = UiState.Loading("Autenticando no PBX...")
                 withContext(Dispatchers.IO) { client.login() }
 
-                // 2. Buscar CDR
-                _uiState.value = UiState.Loading("Buscando última chamada gravada...")
-                val recording = withContext(Dispatchers.IO) {
-                    client.getLastRecording(numRecords = 200)
+                _uiState.value = UiState.Loading("Buscando gravações dos últimos 2 dias...")
+                val recordings = withContext(Dispatchers.IO) {
+                    client.getRecordingsWithAudio(maxResults = 5)
                 }
 
-                if (recording == null) {
+                if (recordings.isEmpty()) {
+                    withContext(Dispatchers.IO) { client.logout() }
                     _uiState.value = UiState.Error(
-                        "Nenhuma chamada gravada encontrada.\n" +
+                        "Nenhuma chamada gravada encontrada nos últimos 2 dias.\n" +
                         "Verifique se a gravação automática está ativada no PBX."
                     )
                     return@launch
                 }
 
-                Log.d(TAG, "Gravação encontrada: ${recording.recordFile}")
-                currentRecording = recording
-                _uiState.value = UiState.RecordingFound(recording, null)
+                // Guarda o cliente ativo para usar na etapa de seleção
+                pbxClient = client
+                _uiState.value = UiState.SelectRecording(recordings)
 
-                // 3. Baixar o arquivo de áudio
-                _uiState.value = UiState.Loading("Baixando gravação: ${recording.recordFile}...")
+            } catch (e: Exception) {
+                Log.e(TAG, "Erro ao buscar gravações: ${e.message}", e)
+                withContext(Dispatchers.IO) { client.logout() }
+                _uiState.value = UiState.Error(e.message ?: "Falha desconhecida")
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Etapa 2: Seleção — baixa a gravação escolhida pelo usuário
+    // ─────────────────────────────────────────────────────────────────────────
+
+    fun selectAndDownload(recording: CallRecording) {
+        val client = pbxClient ?: run {
+            _uiState.value = UiState.Error("Sessão expirada. Faça a busca novamente.")
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                _uiState.value = UiState.Loading("Obtendo informações do arquivo...")
+                val (filedir, filename) = withContext(Dispatchers.IO) {
+                    client.getRecordInfosByCall(recording.cdrId)
+                }
+
+                _uiState.value = UiState.Loading("Baixando gravação: $filename...")
                 val cacheDir = getApplication<Application>().cacheDir
                 val audioDir = File(cacheDir, "recordings").also { it.mkdirs() }
 
                 val audioFile = withContext(Dispatchers.IO) {
                     client.downloadRecording(
-                        filename = recording.recordFile,
-                        destDir = audioDir
+                        filename = filename,
+                        filedir  = filedir,
+                        destDir  = audioDir
                     )
                 }
 
+                currentRecording = recording
                 currentFile = audioFile
-                _uiState.value = UiState.RecordingFound(recording, audioFile)
+                _uiState.value = UiState.RecordingReady(recording, audioFile)
 
             } catch (e: Exception) {
-                Log.e(TAG, "Erro ao buscar gravação: ${e.message}", e)
-                _uiState.value = UiState.Error("Erro: ${e.message ?: "Falha desconhecida"}")
+                Log.e(TAG, "Erro ao baixar gravação: ${e.message}", e)
+                _uiState.value = UiState.Error(e.message ?: "Falha ao baixar gravação")
             } finally {
-                // Sempre faz logout
                 withContext(Dispatchers.IO) { client.logout() }
+                pbxClient = null
             }
         }
     }
@@ -105,13 +138,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // ─────────────────────────────────────────────────────────────────────────
 
     fun playPause() {
-        val file = currentFile ?: return
+        val file      = currentFile      ?: return
         val recording = currentRecording ?: return
-
-        val player = mediaPlayer
+        val player    = mediaPlayer
 
         if (player == null || !player.isPlaying) {
-            // Iniciar ou retomar reprodução
             if (player == null) {
                 startPlayback(file, recording)
             } else {
@@ -119,7 +150,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.value = UiState.Playing(recording, file)
             }
         } else {
-            // Pausar
             player.pause()
             _uiState.value = UiState.Paused(recording, file)
         }
@@ -128,23 +158,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun stopPlayback() {
         releasePlayer()
         val recording = currentRecording
-        val file = currentFile
+        val file      = currentFile
         if (recording != null && file != null) {
-            _uiState.value = UiState.RecordingFound(recording, file)
+            _uiState.value = UiState.RecordingReady(recording, file)
         }
     }
 
-    fun getPlaybackProgress(): Int {
-        return try {
-            mediaPlayer?.let {
-                if (it.duration > 0) {
-                    (it.currentPosition * 100 / it.duration)
-                } else 0
-            } ?: 0
-        } catch (e: Exception) { 0 }
-    }
+    fun getPlaybackProgress(): Int = try {
+        mediaPlayer?.let {
+            if (it.duration > 0) (it.currentPosition * 100 / it.duration) else 0
+        } ?: 0
+    } catch (e: Exception) { 0 }
 
-    fun getDuration(): Int = try { mediaPlayer?.duration ?: 0 } catch (e: Exception) { 0 }
+    fun getDuration(): Int        = try { mediaPlayer?.duration        ?: 0 } catch (e: Exception) { 0 }
     fun getCurrentPosition(): Int = try { mediaPlayer?.currentPosition ?: 0 } catch (e: Exception) { 0 }
 
     fun seekTo(positionMs: Int) {
@@ -157,12 +183,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun startPlayback(file: File, recording: CallRecording) {
         releasePlayer()
-
         try {
             val player = MediaPlayer().apply {
                 setDataSource(file.absolutePath)
                 setOnCompletionListener {
-                    _uiState.postValue(UiState.RecordingFound(recording, file))
+                    _uiState.postValue(UiState.RecordingReady(recording, file))
                     releasePlayer()
                 }
                 setOnErrorListener { _, what, extra ->
@@ -176,7 +201,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             mediaPlayer = player
             _uiState.value = UiState.Playing(recording, file)
-
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao iniciar playback: ${e.message}", e)
             _uiState.value = UiState.Error("Não foi possível reproduzir o arquivo: ${e.message}")
@@ -185,10 +209,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun releasePlayer() {
         try {
-            mediaPlayer?.let {
-                if (it.isPlaying) it.stop()
-                it.release()
-            }
+            mediaPlayer?.let { if (it.isPlaying) it.stop(); it.release() }
         } catch (e: Exception) {
             Log.w(TAG, "Erro ao liberar player: ${e.message}")
         }
@@ -198,5 +219,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     override fun onCleared() {
         super.onCleared()
         releasePlayer()
+        viewModelScope.launch(Dispatchers.IO) { pbxClient?.logout() }
     }
 }
