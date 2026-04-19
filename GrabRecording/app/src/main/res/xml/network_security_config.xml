@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Permite conexões HTTPS com certificados autoassinados do PBX Grandstream UCM.
+    IMPORTANTE: Esta configuração é necessária porque o UCM usa certificado autoassinado.
+    Em produção, considere usar o certificado específico do PBX em vez de trustAllCertificates.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <!-- Confia nas CAs do sistema -->
+            <certificates src="system" />
+            <!-- Confia em CAs do usuário (para certificados instalados no dispositivo) -->
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Configuração específica para o domínio do PBX -->
+    <!-- Substitua "192.168.0.0/16" pelo IP/hostname do seu PBX se necessário -->
+    <domain-config cleartextTrafficPermitted="false">
+        <!-- Adicione o IP do seu PBX aqui se quiser restringir -->
+        <!-- <domain includeSubdomains="false">192.168.1.100</domain> -->
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>

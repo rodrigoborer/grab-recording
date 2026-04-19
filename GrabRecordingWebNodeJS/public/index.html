@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Grab Recording — PBX</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f0f4f8;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 24px 16px;
+    }
+
+    .container { width: 100%; max-width: 600px; display: flex; flex-direction: column; gap: 16px; }
+
+    .header { text-align: center; padding: 8px 0; }
+    .header h1 { font-size: 1.6rem; font-weight: 700; color: #1a56db; }
+    .header p  { font-size: 0.85rem; color: #6b7280; margin-top: 4px; }
+
+    .card {
+      background: #fff;
+      border-radius: 14px;
+      padding: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    }
+    .card-title {
+      font-size: 0.9rem; font-weight: 600; color: #374151;
+      margin-bottom: 14px; display: flex; align-items: center; gap: 6px;
+    }
+
+    .form-row { display: flex; gap: 12px; }
+    .field { display: flex; flex-direction: column; gap: 5px; flex: 1; margin-bottom: 12px; }
+    .field label { font-size: 0.78rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.4px; }
+    .field input {
+      padding: 9px 12px; border: 1.5px solid #d1d5db; border-radius: 8px;
+      font-size: 0.93rem; color: #111827; outline: none; transition: border-color 0.15s; width: 100%;
+    }
+    .field input:focus { border-color: #1a56db; }
+
+    .btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      width: 100%; padding: 11px 16px; border: none; border-radius: 9px;
+      font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+    .btn-primary { background: #1a56db; color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: #1547bd; }
+
+    /* ── Log panel ─────────────────────────────────────────────────── */
+    #logCard { display: none; }
+
+    .log-toolbar {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 10px; flex-wrap: wrap;
+    }
+    .log-toolbar span { font-size: 0.9rem; font-weight: 600; color: #374151; flex: 1; }
+    .btn-sm {
+      padding: 4px 10px; border: 1px solid #d1d5db; border-radius: 6px;
+      background: #f9fafb; font-size: 0.78rem; cursor: pointer; color: #374151;
+    }
+    .btn-sm:hover { background: #f3f4f6; }
+
+    #logBox {
+      background: #0f172a;
+      border-radius: 8px;
+      padding: 12px;
+      max-height: 420px;
+      overflow-y: auto;
+      font-family: 'Menlo', 'Consolas', monospace;
+      font-size: 0.78rem;
+      line-height: 1.6;
+    }
+
+    .log-line {
+      display: flex; gap: 8px; padding: 2px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      cursor: pointer;
+    }
+    .log-line:hover { background: rgba(255,255,255,0.05); }
+
+    .log-ts   { color: #475569; white-space: nowrap; flex-shrink: 0; }
+    .log-icon { flex-shrink: 0; width: 16px; text-align: center; }
+    .log-msg  { color: #e2e8f0; word-break: break-all; flex: 1; }
+
+    .log-line.step     .log-msg { color: #93c5fd; }   /* azul  — etapa */
+    .log-line.ok       .log-msg { color: #86efac; }   /* verde — ok    */
+    .log-line.error    .log-msg { color: #fca5a5; }   /* vermelho — erro */
+    .log-line.request  .log-msg { color: #fde68a; }   /* amarelo — req */
+    .log-line.response .log-msg { color: #c4b5fd; }   /* roxo — resp  */
+    .log-line.info     .log-msg { color: #94a3b8; }   /* cinza — info */
+
+    .log-detail {
+      display: none; background: rgba(255,255,255,0.06);
+      border-radius: 6px; padding: 8px; margin: 4px 0 4px 24px;
+      white-space: pre-wrap; color: #cbd5e1; font-size: 0.75rem;
+      word-break: break-all;
+    }
+    .log-line.expanded + .log-detail { display: block; }
+
+    /* ── Recording info ─────────────────────────────────────────────── */
+    .info-grid { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; font-size: 0.88rem; }
+    .info-grid .lbl { color: #6b7280; font-weight: 600; white-space: nowrap; }
+    .info-grid .val { color: #111827; word-break: break-all; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; background: #d1fae5; color: #065f46; }
+    .badge.unanswered { background: #fee2e2; color: #991b1b; }
+
+    /* ── Player ─────────────────────────────────────────────────────── */
+    .player-wrap { display: flex; flex-direction: column; gap: 14px; }
+    .waveform-bar { display: flex; align-items: center; gap: 10px; }
+    .time-label { font-size: 0.78rem; color: #6b7280; font-variant-numeric: tabular-nums; min-width: 38px; }
+    .time-label.end { text-align: right; }
+
+    input[type=range] { -webkit-appearance: none; appearance: none; flex: 1; height: 4px; background: #d1d5db; border-radius: 4px; outline: none; cursor: pointer; }
+    input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #1a56db; cursor: pointer; border: 2px solid #fff; box-shadow: 0 0 0 1px #1a56db; }
+
+    .controls { display: flex; align-items: center; justify-content: center; gap: 12px; }
+    .ctrl-btn { background: none; border: none; cursor: pointer; padding: 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #374151; transition: background 0.15s; }
+    .ctrl-btn:hover { background: #f3f4f6; }
+    .ctrl-btn.play-btn { background: #1a56db; color: #fff; width: 50px; height: 50px; }
+    .ctrl-btn.play-btn:hover { background: #1547bd; }
+    .volume-row { display: flex; align-items: center; gap: 8px; }
+    .volume-icon { color: #9ca3af; }
+
+    #audioEl { display: none; }
+    .divider { border: none; border-top: 1px solid #e5e7eb; margin: 4px 0; }
+    .hidden { display: none !important; }
+
+    /* spinner */
+    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #d1d5db; border-top-color: #1a56db; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>📞 Grab Recording</h1>
+    <p>Grandstream UCM6xxx · Última gravação</p>
+  </div>
+
+  <!-- Config -->
+  <div class="card">
+    <div class="card-title">⚙️ Configuração do PBX</div>
+    <div class="form-row">
+      <div class="field" style="flex:3">
+        <label>IP / Host</label>
+        <input id="host" type="text" placeholder="192.168.1.100" autocomplete="off" />
+      </div>
+      <div class="field" style="flex:1">
+        <label>Porta</label>
+        <input id="port" type="number" placeholder="8089" />
+      </div>
+    </div>
+    <div class="field">
+      <label>Usuário da API</label>
+      <input id="username" type="text" placeholder="cdrapi" autocomplete="off" />
+    </div>
+    <div class="field">
+      <label>Senha da API</label>
+      <input id="password" type="password" placeholder="••••••••" autocomplete="off" />
+    </div>
+    <button class="btn btn-primary" id="btnFetch" onclick="fetchRecording()">
+      🔍 Buscar Última Gravação
+    </button>
+  </div>
+
+  <!-- Log panel -->
+  <div class="card" id="logCard">
+    <div class="log-toolbar">
+      <span>🔎 Log de depuração</span>
+      <button class="btn-sm" onclick="copyLog()">📋 Copiar</button>
+      <button class="btn-sm" onclick="clearLog()">🗑 Limpar</button>
+    </div>
+    <div id="logBox"></div>
+    <p style="font-size:0.75rem;color:#9ca3af;margin-top:8px">Clique em qualquer linha para ver detalhes completos.</p>
+  </div>
+
+  <!-- Resultado -->
+  <div class="card hidden" id="cardResult">
+    <div class="card-title">📋 Última Chamada Gravada</div>
+    <div class="info-grid" id="infoGrid"></div>
+    <hr class="divider" style="margin:14px 0" />
+    <div class="player-wrap">
+      <div class="waveform-bar">
+        <span class="time-label" id="timeCurrent">0:00</span>
+        <input type="range" id="seekBar" min="0" max="100" value="0" step="0.1" />
+        <span class="time-label end" id="timeTotal">0:00</span>
+      </div>
+      <div class="controls">
+        <button class="ctrl-btn" title="Voltar 10s" onclick="skip(-10)">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 17l-5-5 5-5"/><path d="M18 17l-5-5 5-5"/></svg>
+        </button>
+        <button class="ctrl-btn play-btn" id="btnPlay" onclick="togglePlay()">
+          <svg id="iconPlay" width="22" height="22" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          <svg id="iconPause" class="hidden" width="22" height="22" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+        </button>
+        <button class="ctrl-btn" title="Avançar 10s" onclick="skip(10)">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 17l5-5-5-5"/><path d="M6 17l5-5-5-5"/></svg>
+        </button>
+      </div>
+      <div class="volume-row">
+        <span class="volume-icon">🔈</span>
+        <input type="range" id="volBar" min="0" max="1" step="0.05" value="1" style="width:110px" oninput="audio.volume=this.value" />
+        <span class="volume-icon">🔊</span>
+      </div>
+    </div>
+    <audio id="audioEl"></audio>
+  </div>
+
+</div>
+
+<script>
+// ── Persist config ─────────────────────────────────────────────────────────
+const FIELDS = ['host','port','username','password'];
+FIELDS.forEach(id => {
+  const el = document.getElementById(id);
+  el.value = localStorage.getItem('pbx_' + id) || '';
+  el.addEventListener('change', () => localStorage.setItem('pbx_' + id, el.value));
+});
+if (!document.getElementById('port').value)
+  document.getElementById('port').value = '8089';
+
+// ── Audio ──────────────────────────────────────────────────────────────────
+const audio = document.getElementById('audioEl');
+let duration = 0;
+
+// ── Log panel ──────────────────────────────────────────────────────────────
+const logBox  = document.getElementById('logBox');
+const logCard = document.getElementById('logCard');
+let   logLines = [];   // texto puro para copiar
+
+function nowStr() {
+  return new Date().toTimeString().substring(0,8);
+}
+
+const TYPE_META = {
+  step:     { icon: '▶', cls: 'step'     },
+  ok:       { icon: '✓', cls: 'ok'       },
+  error:    { icon: '✗', cls: 'error'    },
+  request:  { icon: '↑', cls: 'request'  },
+  response: { icon: '↓', cls: 'response' },
+  info:     { icon: '·', cls: 'info'     },
+  done:     { icon: '★', cls: 'ok'       },
+};
+
+function addLog(obj) {
+  logCard.style.display = '';
+  const meta   = TYPE_META[obj.type] || { icon: '·', cls: 'info' };
+  const detail = buildDetail(obj);
+  const plainMsg = buildPlainMsg(obj);
+
+  logLines.push(`[${nowStr()}] [${obj.type}] ${plainMsg}`);
+  if (detail) logLines.push('  ' + detail);
+
+  const line = document.createElement('div');
+  line.className = `log-line ${meta.cls}`;
+  line.innerHTML = `
+    <span class="log-ts">${nowStr()}</span>
+    <span class="log-icon">${meta.icon}</span>
+    <span class="log-msg">${esc(plainMsg)}</span>`;
+
+  if (detail) {
+    const detDiv = document.createElement('div');
+    detDiv.className = 'log-detail';
+    detDiv.textContent = detail;
+    line.addEventListener('click', () => {
+      line.classList.toggle('expanded');
+    });
+    logBox.appendChild(line);
+    logBox.appendChild(detDiv);
+  } else {
+    logBox.appendChild(line);
+  }
+
+  logBox.scrollTop = logBox.scrollHeight;
+}
+
+function buildPlainMsg(obj) {
+  if (obj.msg) return obj.msg;
+  if (obj.type === 'request')  return `→ POST ${obj.url || ''} — ${JSON.stringify(obj.payload || {}).substring(0,120)}`;
+  if (obj.type === 'response') return `← HTTP ${obj.status} — ${JSON.stringify(obj.body || obj.headers || {}).substring(0,120)}`;
+  if (obj.type === 'done')     return `✅ Concluído — arquivo: ${obj.audioFile} (${formatBytes(obj.fileSizeBytes)})`;
+  return JSON.stringify(obj).substring(0, 200);
+}
+
+function buildDetail(obj) {
+  const skip = ['type','step','msg'];
+  const rest = {};
+  for (const [k,v] of Object.entries(obj)) {
+    if (!skip.includes(k)) rest[k] = v;
+  }
+  if (Object.keys(rest).length === 0) return '';
+  return JSON.stringify(rest, null, 2);
+}
+
+function clearLog() {
+  logBox.innerHTML = '';
+  logLines = [];
+}
+
+function copyLog() {
+  navigator.clipboard.writeText(logLines.join('\n'))
+    .then(() => alert('Log copiado para a área de transferência!'))
+    .catch(() => alert('Não foi possível copiar automaticamente. Selecione o texto manualmente.'));
+}
+
+// ── Fetch com streaming ────────────────────────────────────────────────────
+async function fetchRecording() {
+  const host     = document.getElementById('host').value.trim();
+  const port     = document.getElementById('port').value.trim() || '8089';
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value;
+
+  if (!host || !username || !password) {
+    addLog({ type: 'error', step: 'validation', msg: '⚠️ Preencha o IP/host, usuário e senha.' });
+    return;
+  }
+
+  FIELDS.forEach(id => localStorage.setItem('pbx_' + id, document.getElementById(id).value));
+
+  clearLog();
+  document.getElementById('cardResult').classList.add('hidden');
+  setBtnLoading(true);
+
+  addLog({ type: 'info', msg: `Iniciando busca: ${username}@${host}:${port}` });
+
+  try {
+    const resp = await fetch('/api/fetch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ host, port: Number(port), username, password })
+    });
+
+    const reader  = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let   buffer  = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();   // último fragmento incompleto
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const obj = JSON.parse(line);
+          addLog(obj);
+
+          if (obj.type === 'done') {
+            showRecording(obj);
+          }
+        } catch (e) {
+          addLog({ type: 'info', msg: `[raw] ${line}` });
+        }
+      }
+    }
+
+    // Processa sobras do buffer
+    if (buffer.trim()) {
+      try {
+        const obj = JSON.parse(buffer);
+        addLog(obj);
+        if (obj.type === 'done') showRecording(obj);
+      } catch (_) {}
+    }
+
+  } catch (err) {
+    addLog({ type: 'error', step: 'network', msg: `Falha de rede: ${err.message}`, raw: String(err) });
+  } finally {
+    setBtnLoading(false);
+  }
+}
+
+// ── Render recording ───────────────────────────────────────────────────────
+function showRecording({ recording, audioFile, fileSizeBytes }) {
+  const answered = (recording.disposition || '').toUpperCase() === 'ANSWERED';
+  const badge = `<span class="badge ${answered ? '' : 'unanswered'}">${esc(recording.disposition || '—')}</span>`;
+
+  document.getElementById('infoGrid').innerHTML = `
+    <span class="lbl">De</span>       <span class="val">${esc(recording.caller)}</span>
+    <span class="lbl">Para</span>     <span class="val">${esc(recording.callee)}</span>
+    <span class="lbl">Início</span>   <span class="val">${esc(recording.start)}</span>
+    <span class="lbl">Duração</span>  <span class="val">${formatSec(Number(recording.duration))}</span>
+    <span class="lbl">Status</span>   <span class="val">${badge}</span>
+    <span class="lbl">Arquivo</span>  <span class="val" style="font-size:.78rem">${esc(audioFile)}</span>
+    <span class="lbl">Tamanho</span>  <span class="val">${formatBytes(fileSizeBytes)}</span>`;
+
+  audio.src = '/api/audio/' + encodeURIComponent(audioFile);
+  audio.load();
+  resetPlayer();
+  document.getElementById('cardResult').classList.remove('hidden');
+  document.getElementById('cardResult').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ── Player ─────────────────────────────────────────────────────────────────
+function togglePlay() { audio.paused ? audio.play() : audio.pause(); }
+function skip(s)      { audio.currentTime = Math.max(0, Math.min(audio.duration||0, audio.currentTime+s)); }
+function resetPlayer() {
+  document.getElementById('seekBar').value = 0;
+  document.getElementById('timeCurrent').textContent = '0:00';
+  document.getElementById('timeTotal').textContent   = '0:00';
+  setPlayIcon(true); duration = 0;
+}
+function setPlayIcon(isPlay) {
+  document.getElementById('iconPlay').classList.toggle('hidden', !isPlay);
+  document.getElementById('iconPause').classList.toggle('hidden', isPlay);
+}
+
+audio.addEventListener('play',  () => setPlayIcon(false));
+audio.addEventListener('pause', () => setPlayIcon(true));
+audio.addEventListener('ended', () => setPlayIcon(true));
+audio.addEventListener('loadedmetadata', () => {
+  duration = audio.duration;
+  document.getElementById('timeTotal').textContent = fmtTime(duration);
+});
+audio.addEventListener('timeupdate', () => {
+  if (!duration) return;
+  document.getElementById('seekBar').value = (audio.currentTime / duration) * 100;
+  document.getElementById('timeCurrent').textContent = fmtTime(audio.currentTime);
+});
+document.getElementById('seekBar').addEventListener('input', function() {
+  if (duration) audio.currentTime = (this.value / 100) * duration;
+});
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function setBtnLoading(on) {
+  const btn = document.getElementById('btnFetch');
+  btn.disabled = on;
+  btn.innerHTML = on
+    ? '<span class="spinner"></span>Aguarde…'
+    : '🔍 Buscar Última Gravação';
+}
+
+function fmtTime(s) {
+  if (!isFinite(s)) return '0:00';
+  return `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+}
+function formatSec(t) { return `${Math.floor(t/60)}m ${t%60}s`; }
+function formatBytes(b) {
+  if (b >= 1048576) return (b/1048576).toFixed(1)+' MB';
+  if (b >= 1024)    return (b/1024).toFixed(1)+' KB';
+  return b+' B';
+}
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+document.getElementById('password').addEventListener('keydown', e => {
+  if (e.key === 'Enter') fetchRecording();
+});
+</script>
+</body>
+</html>
