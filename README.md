@@ -2,7 +2,7 @@
 
 Ferramenta para baixar e reproduzir gravacoes de chamadas telefonicas a partir de um PBX **Grandstream UCM6xxx** via HTTPS API.
 
-O projeto existe em tres implementacoes independentes, descritas abaixo.
+O projeto existe em quatro implementacoes independentes, descritas abaixo.
 
 ---
 
@@ -102,12 +102,46 @@ Grab Recording/
 │   └── public/
 │       └── index.html
 │
-└── GrabRecordingWebPython/                 # Versao Web (Python) -- mais completa
-    ├── app.py
-    ├── requirements.txt
-    ├── DEPLOY.md
-    └── public/
-        └── index.html
+├── GrabRecordingWebPython/                 # Versao Web (Python) -- mais completa
+│   ├── app.py
+│   ├── requirements.txt
+│   ├── DEPLOY.md
+│   └── public/
+│       └── index.html
+│
+└── GrabRecordingWorker/                    # Versao Cloudflare Worker (serverless)
+    ├── worker.js
+    └── wrangler.toml
+```
+
+---
+
+### Cloudflare Worker (`/GrabRecordingWorker`)
+
+Versao **serverless** que roda na borda da rede Cloudflare, sem custo operacional (plano gratuito).
+
+- Arquivo unico `worker.js` — sem dependencias externas
+- O Worker faz proxy das requisicoes HTTPS para o PBX atraves de um **Cloudflare Tunnel**
+- Audio transmitido diretamente do PBX ao navegador via streaming (sem armazenar em disco)
+- Implementacao MD5 em JS puro (Web Crypto API nao suporta MD5)
+- Interface identica as versoes Python e Node.js (wizard passo a passo com player de audio)
+- Arquivos principais:
+  - `worker.js` — Worker completo (logica + frontend inline)
+  - `wrangler.toml` — configuracao do Wrangler CLI
+
+**Pre-requisito:** Cloudflare Tunnel apontando para o PBX local com HTTPS habilitado.
+
+**Para fazer deploy:**
+```bash
+npm install -g wrangler
+wrangler login
+wrangler deploy
+```
+
+**Para testar localmente:**
+```bash
+wrangler dev
+# Acesse http://localhost:8787
 ```
 
 ---
